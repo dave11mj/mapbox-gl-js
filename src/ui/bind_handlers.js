@@ -1,11 +1,8 @@
 // @flow
 
-const Point = require('@mapbox/point-geometry');
 const DOM = require('../util/dom');
-const window = require('../util/window');
-
-const iOS = !!window.navigator.platform &&
-    /iPad|iPhone|iPod/.test(window.navigator.platform); // https://stackoverflow.com/a/9039885
+const {Event} = require('../util/evented');
+const Point = require('@mapbox/point-geometry');
 
 import type Map from './map';
 
@@ -33,24 +30,18 @@ module.exports = function bindHandlers(map: Map, options: {}) {
         }
     }
 
-    DOM.addEventListener(el, 'mouseout', onMouseOut);
-    DOM.addEventListener(el, 'mousedown', onMouseDown);
-    DOM.addEventListener(el, 'mouseup', onMouseUp);
-    DOM.addEventListener(el, 'mousemove', onMouseMove);
-    DOM.addEventListener(el, 'mouseover', onMouseOver);
-    // Bind touchstart with passive: true because onTouchStart only fires a map event
-    DOM.addEventListener(el, 'touchstart', onTouchStart, {passive: true});
-
-    // Bind touchmove with passive: false on iOS because, even though
-    // onTouchMove only fires a map event, binding with passive: true causes
-    // iOS not to respect e.preventDefault() in _other_ handlers, even if they
-    // are non-passive.  https://bugs.webkit.org/show_bug.cgi?id=182521
-    DOM.addEventListener(el, 'touchmove', onTouchMove, {passive: !iOS});
-    DOM.addEventListener(el, 'touchend', onTouchEnd);
-    DOM.addEventListener(el, 'touchcancel', onTouchCancel);
-    DOM.addEventListener(el, 'click', onClick);
-    DOM.addEventListener(el, 'dblclick', onDblClick);
-    DOM.addEventListener(el, 'contextmenu', onContextMenu);
+    el.addEventListener('mouseout', onMouseOut, false);
+    el.addEventListener('mousedown', onMouseDown, false);
+    el.addEventListener('mouseup', onMouseUp, false);
+    el.addEventListener('mousemove', onMouseMove, false);
+    el.addEventListener('mouseover', onMouseOver, false);
+    el.addEventListener('touchstart', onTouchStart, false);
+    el.addEventListener('touchend', onTouchEnd, false);
+    el.addEventListener('touchmove', onTouchMove, false);
+    el.addEventListener('touchcancel', onTouchCancel, false);
+    el.addEventListener('click', onClick, false);
+    el.addEventListener('dblclick', onDblClick, false);
+    el.addEventListener('contextmenu', onContextMenu, false);
 
     function onMouseOut(e: MouseEvent) {
         fireMouseEvent('mouseout', e);
@@ -68,7 +59,7 @@ module.exports = function bindHandlers(map: Map, options: {}) {
     }
 
     function onMouseUp(e: MouseEvent) {
-        const rotating = map.dragRotate && map.dragRotate.isActive();
+        const rotating = map.dragRotate.isActive();
 
         if (contextMenuEvent && !rotating) {
             // This will be the case for Mac
@@ -81,8 +72,8 @@ module.exports = function bindHandlers(map: Map, options: {}) {
     }
 
     function onMouseMove(e: MouseEvent) {
-        if (map.dragPan && map.dragPan.isActive()) return;
-        if (map.dragRotate && map.dragRotate.isActive()) return;
+        if (map.dragPan.isActive()) return;
+        if (map.dragRotate.isActive()) return;
 
         let target: any = e.toElement || e.target;
         while (target && target !== el) target = target.parentNode;
@@ -146,7 +137,7 @@ module.exports = function bindHandlers(map: Map, options: {}) {
     }
 
     function onContextMenu(e: MouseEvent) {
-        const rotating = map.dragRotate && map.dragRotate.isActive();
+        const rotating = map.dragRotate.isActive();
         if (!mouseDown && !rotating) {
             // Windows: contextmenu fired on mouseup, so fire event now
             fireMouseEvent('contextmenu', e);
@@ -161,11 +152,11 @@ module.exports = function bindHandlers(map: Map, options: {}) {
     function fireMouseEvent(type, e) {
         const pos = DOM.mousePos(el, e);
 
-        return map.fire(type, {
+        return map.fire(new Event(type, {
             lngLat: map.unproject(pos),
             point: pos,
             originalEvent: e
-        });
+        }));
     }
 
     function fireTouchEvent(type, e) {
@@ -174,12 +165,12 @@ module.exports = function bindHandlers(map: Map, options: {}) {
             return prev.add(curr.div(arr.length));
         }, new Point(0, 0));
 
-        return map.fire(type, {
+        return map.fire(new Event(type, {
             lngLat: map.unproject(singular),
             point: singular,
             lngLats: touches.map((t) => { return map.unproject(t); }, this),
             points: touches,
             originalEvent: e
-        });
+        }));
     }
 };
