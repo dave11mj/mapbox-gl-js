@@ -18,8 +18,6 @@ const inertiaLinearity = 0.15,
 /**
  * The `TouchZoomRotateHandler` allows the user to zoom and rotate the map by
  * pinching on a touchscreen.
- *
- * @param {Map} map The Mapbox GL JS map to add the handler to.
  */
 class TouchZoomRotateHandler {
     _map: Map;
@@ -33,12 +31,14 @@ class TouchZoomRotateHandler {
     _gestureIntent: 'rotate' | 'zoom' | void;
     _inertia: Array<[number, number, Point]>;
 
+    /**
+     * @private
+     */
     constructor(map: Map) {
         this._map = map;
         this._el = map.getCanvasContainer();
 
         util.bindAll([
-            '_onStart',
             '_onMove',
             '_onEnd'
         ], this);
@@ -67,7 +67,6 @@ class TouchZoomRotateHandler {
     enable(options: any) {
         if (this.isEnabled()) return;
         this._el.classList.add('mapboxgl-touch-zoom-rotate');
-        DOM.addEventListener(this._el, 'touchstart', this._onStart, {passive: false});
         this._enabled = true;
         this._aroundCenter = options && options.around === 'center';
     }
@@ -81,7 +80,6 @@ class TouchZoomRotateHandler {
     disable() {
         if (!this.isEnabled()) return;
         this._el.classList.remove('mapboxgl-touch-zoom-rotate');
-        DOM.removeEventListener(this._el, 'touchstart', this._onStart, {passive: false});
         this._enabled = false;
     }
 
@@ -107,7 +105,8 @@ class TouchZoomRotateHandler {
         this._rotationDisabled = false;
     }
 
-    _onStart(e: TouchEvent) {
+    onStart(e: TouchEvent) {
+        if (!this.isEnabled()) return;
         if (e.touches.length !== 2) return;
 
         const p0 = DOM.mousePos(this._el, e.touches[0]),
@@ -119,8 +118,8 @@ class TouchZoomRotateHandler {
         this._gestureIntent = undefined;
         this._inertia = [];
 
-        DOM.addEventListener(window.document, 'touchmove', this._onMove, {passive: false});
-        DOM.addEventListener(window.document, 'touchend', this._onEnd);
+        window.document.addEventListener('touchmove', this._onMove, false);
+        window.document.addEventListener('touchend', this._onEnd, false);
     }
 
     _onMove(e: TouchEvent) {
@@ -173,8 +172,8 @@ class TouchZoomRotateHandler {
     }
 
     _onEnd(e: TouchEvent) {
-        DOM.removeEventListener(window.document, 'touchmove', this._onMove, {passive: false});
-        DOM.removeEventListener(window.document, 'touchend', this._onEnd);
+        window.document.removeEventListener('touchmove', this._onMove);
+        window.document.removeEventListener('touchend', this._onEnd);
         this._drainInertiaBuffer();
 
         const inertia = this._inertia,

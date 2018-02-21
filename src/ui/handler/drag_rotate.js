@@ -18,12 +18,6 @@ const inertiaLinearity = 0.25,
 /**
  * The `DragRotateHandler` allows the user to rotate the map by clicking and
  * dragging the cursor while holding the right mouse button or `ctrl` key.
- *
- * @param {Map} map The Mapbox GL JS map to add the handler to.
- * @param {Object} [options]
- * @param {number} [options.bearingSnap] The threshold, measured in degrees, that determines when the map's
- *   bearing will snap to north.
- * @param {bool} [options.pitchWithRotate=true] Control the map pitch in addition to the bearing
  */
 class DragRotateHandler {
     _map: Map;
@@ -31,6 +25,7 @@ class DragRotateHandler {
     _enabled: boolean;
     _active: boolean;
     _button: 'right' | 'left';
+    _eventButton: number;
     _bearingSnap: number;
     _pitchWithRotate: boolean;
 
@@ -40,6 +35,14 @@ class DragRotateHandler {
     _inertia: Array<[number, number]>;
     _center: Point;
 
+    /**
+     * @param {Map} map The Mapbox GL JS map to add the handler to.
+     * @param {Object} [options]
+     * @param {number} [options.bearingSnap] The threshold, measured in degrees, that determines when the map's
+     *   bearing will snap to north.
+     * @param {bool} [options.pitchWithRotate=true] Control the map pitch in addition to the bearing
+     * @private
+     */
     constructor(map: Map, options: {
         button?: 'right' | 'left',
         element?: HTMLElement,
@@ -53,7 +56,6 @@ class DragRotateHandler {
         this._pitchWithRotate = options.pitchWithRotate !== false;
 
         util.bindAll([
-            '_onDown',
             '_onMove',
             '_onUp',
             '_onDragFrame'
@@ -86,7 +88,6 @@ class DragRotateHandler {
      */
     enable() {
         if (this.isEnabled()) return;
-        this._el.addEventListener('mousedown', this._onDown);
         this._enabled = true;
     }
 
@@ -98,28 +99,28 @@ class DragRotateHandler {
      */
     disable() {
         if (!this.isEnabled()) return;
-        this._el.removeEventListener('mousedown', this._onDown);
         this._enabled = false;
     }
 
-    _onDown(e: MouseEvent) {
-        if (this._map.boxZoom && this._map.boxZoom.isActive()) return;
-        if (this._map.dragPan && this._map.dragPan.isActive()) return;
+    onDown(e: MouseEvent) {
+        if (!this.isEnabled()) return;
+        if (this._map.boxZoom.isActive()) return;
+        if (this._map.dragPan.isActive()) return;
         if (this.isActive()) return;
 
         if (this._button === 'right') {
-            const button = (e.ctrlKey ? 0 : 2);   // ? ctrl+left button : right button
-            let eventButton = e.button;
+            this._eventButton = e.button;
             if (typeof window.InstallTrigger !== 'undefined' && e.button === 2 && e.ctrlKey &&
                 window.navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
                 // Fix for https://github.com/mapbox/mapbox-gl-js/issues/3131:
                 // Firefox (detected by InstallTrigger) on Mac determines e.button = 2 when
                 // using Control + left click
-                eventButton = 0;
+                this._eventButton = 0;
             }
-            if (eventButton !== button) return;
+            if (this._eventButton !== (e.ctrlKey ? 0 : 2)) return;
         } else {
             if (e.ctrlKey || e.button !== 0) return;
+            this._eventButton = 0;
         }
 
         DOM.disableDrag();
@@ -183,6 +184,8 @@ class DragRotateHandler {
     }
 
     _onUp(e: MouseEvent | FocusEvent) {
+        if (e.type === 'mouseup' && e.button !== this._eventButton) return;
+
         window.document.removeEventListener('mousemove', this._onMove, {capture: true});
         window.document.removeEventListener('mouseup', this._onUp);
         window.removeEventListener('blur', this._onUp);

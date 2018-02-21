@@ -25,8 +25,7 @@ const LogoControl = require('./control/logo_control');
 const isSupported = require('@mapbox/mapbox-gl-supported');
 const {RGBAImage} = require('../util/image');
 const {Event, ErrorEvent} = require('../util/evented');
-
-require('./events'); // Pull in for documentation.js
+const {MapMouseEvent} = require('./events');
 
 import type {LngLatLike} from '../geo/lng_lat';
 import type {LngLatBoundsLike} from '../geo/lng_lat_bounds';
@@ -621,7 +620,7 @@ class Map extends Camera {
                         mousein = false;
                     } else if (!mousein) {
                         mousein = true;
-                        listener.call(this, util.extend({features}, e, {type}));
+                        listener.call(this, new MapMouseEvent(type, this, e.originalEvent, {features}));
                     }
                 };
                 const mouseout = () => {
@@ -636,13 +635,13 @@ class Map extends Camera {
                         mousein = true;
                     } else if (mousein) {
                         mousein = false;
-                        listener.call(this, util.extend({}, e, {type}));
+                        listener.call(this, new MapMouseEvent(type, this, e.originalEvent));
                     }
                 };
                 const mouseout = (e) => {
                     if (mousein) {
                         mousein = false;
-                        listener.call(this, util.extend({}, e, {type}));
+                        listener.call(this, new MapMouseEvent(type, this, e.originalEvent));
                     }
                 };
                 return {layer, listener, delegates: {mousemove, mouseout}};
@@ -650,7 +649,10 @@ class Map extends Camera {
                 const delegate = (e) => {
                     const features = this.getLayer(layer) ? this.queryRenderedFeatures(e.point, {layers: [layer]}) : [];
                     if (features.length) {
-                        listener.call(this, util.extend({features}, e));
+                        // Here we need to mutate the original event, so that preventDefault works as expected.
+                        e.features = features;
+                        listener.call(this, e);
+                        delete e.features;
                     }
                 };
                 return {layer, listener, delegates: {[type]: delegate}};
