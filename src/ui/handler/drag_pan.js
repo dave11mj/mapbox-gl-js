@@ -164,6 +164,8 @@ class DragPanHandler {
         delete this._previousPos;
         delete this._pos;
 
+        DOM.suppressClick();
+
         this._fireEvent('dragend', e);
         this._drainInertiaBuffer();
 
